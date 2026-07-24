@@ -82,7 +82,7 @@ export default function Preloader() {
         {/* Light Mode Progress Bar Line */}
         <div className="w-48 sm:w-64 h-[3px] bg-[#E5E3DE] mx-auto rounded-full overflow-hidden mt-4 shadow-inner">
           <div
-            className="h-full bg-gradient-to-r from-[#C41E2A] via-[#C9982E] to-[#C41E2A] transition-all duration-75"
+            className="h-full bg-[#C41E2A] transition-all duration-75"
             style={{ width: `${progress}%` }}
           />
         </div>

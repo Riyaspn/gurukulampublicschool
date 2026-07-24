@@ -11,7 +11,7 @@ interface LineDrawProps {
 
 export default function LineDraw({
   className = '',
-  color = 'bg-gradient-to-r from-[#C41E2A] via-[#C9982E] to-[#0E7C6B]',
+  color = 'bg-[#C41E2A]',
   delay = 0,
   duration = 800,
 }: LineDrawProps) {
