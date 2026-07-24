@@ -52,11 +52,25 @@ export default function Preloader() {
       className="fixed inset-0 z-[10000] bg-[#FAFAF8] flex flex-col items-center justify-center text-[#1A1A1A] border-b border-[#E5E3DE]"
     >
       <div className="text-center space-y-4 px-4">
-        <div className="font-black tracking-widest text-3xl sm:text-5xl lg:text-6xl text-[#1A1A1A]">
-          GURUKULAM
-        </div>
-        <div className="text-[10px] sm:text-xs font-extrabold text-[#C41E2A] tracking-[0.3em] uppercase">
-          PUBLIC SCHOOL, THRISSUR • ESTD 1992
+        <div className="relative flex items-center justify-center mx-auto mb-2">
+          <img
+            src="/images/logo.png"
+            alt="Gurukulam Public School Logo"
+            className="h-16 sm:h-24 lg:h-28 w-auto object-contain drop-shadow-md animate-pulse"
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = 'none';
+              const fallback = (e.target as HTMLElement).nextElementSibling;
+              if (fallback) (fallback as HTMLElement).style.display = 'block';
+            }}
+          />
+          <div className="hidden text-center space-y-2">
+            <div className="font-black tracking-widest text-3xl sm:text-5xl text-[#1A1A1A]">
+              GURUKULAM
+            </div>
+            <div className="text-[10px] sm:text-xs font-extrabold text-[#C41E2A] tracking-[0.3em] uppercase">
+              PUBLIC SCHOOL, THRISSUR • ESTD 1992
+            </div>
+          </div>
         </div>
 
         {/* Otsuka-Style Light Mode Percentage Counter */}
