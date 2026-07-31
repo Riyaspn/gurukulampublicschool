@@ -20,7 +20,7 @@ const IS_30FPS = true;
 const FRAME_COUNT = IS_30FPS ? 195 : 90;
 const FRAME_STEP = IS_30FPS ? 1 : 3;
 const FRAME_PREFIX = '/images/hero/frame_';
-const FRAME_EXTENSION = '.jpg';
+const FRAME_EXTENSION = '.webp';
 // ==========================================
 
 const chapters = [
@@ -85,7 +85,7 @@ export default function OtsukaAirflowCanvas3D() {
     setCanvasSize();
     window.addEventListener('resize', setCanvasSize);
 
-    // --- 2. Enterprise Priority Anchor & Concurrent Preloader Architecture ---
+    // --- 2. Progressive High-Performance Streaming Architecture ---
     const images: HTMLImageElement[] = [];
     const airframes = { frame: 0 };
 
@@ -96,86 +96,77 @@ export default function OtsukaAirflowCanvas3D() {
       return `${FRAME_PREFIX}${frameNum}${FRAME_EXTENSION}`;
     };
 
-    // Priority Chapter Anchor Frames to download instantaneously
-    const anchorFrames = [0, 29, 68, 108, 150, 194];
-    const loadedIndices = new Set<number>();
-    const loadingIndices = new Set<number>();
+    // Resilient async frame loader with GPU decode and onerror retry handling
+    const loadFrame = (index: number, retryCount = 0): Promise<void> => {
+      if (images[index]?.complete) return Promise.resolve();
 
-    // Load a specific single frame with error recovery & retry logic
-    const loadFrame = (index: number): Promise<void> => {
-      if (loadedIndices.has(index) || loadingIndices.has(index) || index >= FRAME_COUNT) {
-        return Promise.resolve();
-      }
-      loadingIndices.add(index);
-
-      return new Promise<void>((resolve) => {
+      return new Promise((resolve) => {
         const img = new Image();
         img.src = getFrameUrl(index);
-        
-        const handleComplete = () => {
-          loadedIndices.add(index);
-          loadingIndices.delete(index);
-          if (index === airframes.frame || index === 0) {
-            render();
+
+        const handleSuccess = async () => {
+          try {
+            // Async GPU decode to prevent UI jank and stutter during fast scrolling
+            if ('decode' in img) {
+              await img.decode();
+            }
+          } catch {
+            // Ignore decode exceptions on unsupported browsers; complete remains true
           }
+          images[index] = img;
+          if (index === 0 || index === airframes.frame) render();
           resolve();
         };
 
-        img.onload = handleComplete;
+        img.onload = handleSuccess;
         img.onerror = () => {
-          // On network glitch, clean up so it can retry later without stalling the queue
-          loadingIndices.delete(index);
-          resolve();
+          if (retryCount < 2) {
+            // Transient network recovery retry
+            setTimeout(() => {
+              loadFrame(index, retryCount + 1).then(resolve);
+            }, 300 * (retryCount + 1));
+          } else {
+            resolve(); // Never block concurrent pipeline on persistent failure
+          }
         };
 
         images[index] = img;
       });
     };
 
-    // Concurrent Hydration Queue Worker (Sliding window of up to 10 parallel downloads)
-    const runConcurrentPreloader = async () => {
-      // 1. Immediately fetch high-priority milestone chapter anchors
-      await Promise.all(anchorFrames.map((idx) => loadFrame(idx)));
+    // Tier 1: Immediately fetch critical milestone anchor frames for zero-freezing jumping
+    const initTieredPreloader = async () => {
+      // 1. Critical first impressions + chapter anchor points
+      const anchorFrames = [0, 29, 68, 108, 150, FRAME_COUNT - 1].filter(f => f < FRAME_COUNT);
+      await Promise.all(anchorFrames.map(i => loadFrame(i)));
 
-      // 2. Progressively hydrate all remaining frames using an active worker pool
-      const maxConcurrency = 10;
-      const queue = Array.from({ length: FRAME_COUNT }, (_, i) => i).filter(
-        (i) => !loadedIndices.has(i)
-      );
+      // 2. Tier 2: Non-blocking parallel worker pool (up to 8 simultaneous stream requests)
+      const CONCURRENCY_LIMIT = 8;
+      let currentIndex = 1;
 
-      const workers = new Set<Promise<void>>();
-      for (const idx of queue) {
-        const promise = loadFrame(idx).then(() => {
-          workers.delete(promise);
-        });
-        workers.add(promise);
-
-        if (workers.size >= maxConcurrency) {
-          await Promise.race(workers);
+      const runWorker = async () => {
+        while (currentIndex < FRAME_COUNT) {
+          const idx = currentIndex++;
+          if (!images[idx]?.complete) {
+            await loadFrame(idx);
+          }
         }
-      }
+      };
+
+      const workers = Array.from({ length: Math.min(CONCURRENCY_LIMIT, FRAME_COUNT) }, () => runWorker());
+      Promise.all(workers);
     };
 
-    // Initialize high-fidelity concurrent preloading
-    runConcurrentPreloader();
+    initTieredPreloader();
 
-    // --- 3. Chapter-Bounded "Last-Good-Frame" Zero-Blackout Render Engine ---
-    const getChapterRange = (frameIdx: number) => {
-      if (frameIdx >= 150) return { start: 150, end: 194 }; // Chapter V: Campus
-      if (frameIdx >= 108) return { start: 108, end: 149 }; // Chapter IV: Labs
-      if (frameIdx >= 68)  return { start: 68, end: 107 };  // Chapter III: ATL Tinkering Lab
-      if (frameIdx >= 29)  return { start: 29, end: 67 };   // Chapter II: Values & Philosophy
-      return { start: 0, end: 28 };                         // Chapter I: Gateway of Wisdom
-    };
-
+    // --- 3. Resilient Render Logic (Zero Black Screens & Last-Good-Frame Fallback) ---
     const render = () => {
-      let targetIndex = airframes.frame;
-      let img = images[targetIndex];
-      const range = getChapterRange(targetIndex);
+      let img = images[airframes.frame];
 
-      // 1. If target high-def frame is still downloading, scan backward ONLY inside this chapter!
+      // Industry Standard: If requested frame isn't ready yet during fast scrolling,
+      // intelligently step backwards to render the closest available loaded frame!
       if (!img || !img.complete || img.naturalWidth === 0) {
-        for (let i = targetIndex - 1; i >= range.start; i--) {
+        for (let i = airframes.frame - 1; i >= 0; i--) {
           if (images[i] && images[i].complete && images[i].naturalWidth > 0) {
             img = images[i];
             break;
@@ -183,19 +174,10 @@ export default function OtsukaAirflowCanvas3D() {
         }
       }
 
-      // 2. If still unpopulated, scan forward ONLY up to the end of this chapter!
+      // Final safety fallback only if even frame 0 hasn't resolved yet
       if (!img || !img.complete || img.naturalWidth === 0) {
-        for (let i = targetIndex + 1; i <= range.end; i++) {
-          if (images[i] && images[i].complete && images[i].naturalWidth > 0) {
-            img = images[i];
-            break;
-          }
-        }
-      }
-
-      // 3. Ensure we never render an inappropriate cross-chapter scene or flash black boxes
-      if (!img || !img.complete || img.naturalWidth === 0) {
-        // Retain previous canvas state rather than clearing to #070A0F black box during transient loading
+        context.fillStyle = '#070A0F';
+        context.fillRect(0, 0, canvas.width, canvas.height);
         return;
       }
 

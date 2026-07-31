@@ -1,5 +1,0 @@
-/images/hero/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/images/*
-  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
