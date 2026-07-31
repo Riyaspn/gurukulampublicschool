@@ -85,10 +85,9 @@ export default function OtsukaAirflowCanvas3D() {
     setCanvasSize();
     window.addEventListener('resize', setCanvasSize);
 
-    // --- 2. Progressive Preloader Architecture ---
+    // --- 2. Enterprise Priority Anchor & Concurrent Preloader Architecture ---
     const images: HTMLImageElement[] = [];
     const airframes = { frame: 0 };
-    let loadedCount = 0;
 
     // Helper to format frame numbers (10fps: 1, 4, 7... | 30fps: 1, 2, 3, 4...)
     const getFrameUrl = (index: number) => {
@@ -97,37 +96,106 @@ export default function OtsukaAirflowCanvas3D() {
       return `${FRAME_PREFIX}${frameNum}${FRAME_EXTENSION}`;
     };
 
-    // Load a specific batch of images
-    const loadImagesInBatch = (startIndex: number, batchSize: number) => {
-      for (let i = startIndex; i < Math.min(startIndex + batchSize, FRAME_COUNT); i++) {
-        const img = new Image();
-        img.src = getFrameUrl(i);
-        img.onload = () => {
-          loadedCount++;
-          // If we just loaded the very first image, render it immediately
-          if (i === 0) render();
+    // Priority Chapter Anchor Frames to download instantaneously
+    const anchorFrames = [0, 29, 68, 108, 150, 194];
+    const loadedIndices = new Set<number>();
+    const loadingIndices = new Set<number>();
 
-          // Trigger next batch only when current batch finishes
-          if (loadedCount === startIndex + batchSize && startIndex + batchSize < FRAME_COUNT) {
-            loadImagesInBatch(startIndex + batchSize, batchSize);
+    // Load a specific single frame with error recovery & retry logic
+    const loadFrame = (index: number): Promise<void> => {
+      if (loadedIndices.has(index) || loadingIndices.has(index) || index >= FRAME_COUNT) {
+        return Promise.resolve();
+      }
+      loadingIndices.add(index);
+
+      return new Promise<void>((resolve) => {
+        const img = new Image();
+        img.src = getFrameUrl(index);
+        
+        const handleComplete = () => {
+          loadedIndices.add(index);
+          loadingIndices.delete(index);
+          if (index === airframes.frame || index === 0) {
+            render();
           }
+          resolve();
         };
-        images[i] = img;
+
+        img.onload = handleComplete;
+        img.onerror = () => {
+          // On network glitch, clean up so it can retry later without stalling the queue
+          loadingIndices.delete(index);
+          resolve();
+        };
+
+        images[index] = img;
+      });
+    };
+
+    // Concurrent Hydration Queue Worker (Sliding window of up to 10 parallel downloads)
+    const runConcurrentPreloader = async () => {
+      // 1. Immediately fetch high-priority milestone chapter anchors
+      await Promise.all(anchorFrames.map((idx) => loadFrame(idx)));
+
+      // 2. Progressively hydrate all remaining frames using an active worker pool
+      const maxConcurrency = 10;
+      const queue = Array.from({ length: FRAME_COUNT }, (_, i) => i).filter(
+        (i) => !loadedIndices.has(i)
+      );
+
+      const workers = new Set<Promise<void>>();
+      for (const idx of queue) {
+        const promise = loadFrame(idx).then(() => {
+          workers.delete(promise);
+        });
+        workers.add(promise);
+
+        if (workers.size >= maxConcurrency) {
+          await Promise.race(workers);
+        }
       }
     };
 
-    // START PRELOADING:
-    // 1. Immediately request the first 5 frames for instant visual feedback.
-    loadImagesInBatch(0, 5);
+    // Initialize high-fidelity concurrent preloading
+    runConcurrentPreloader();
 
-    // --- 3. Render Logic (object-fit: cover equivalent) ---
+    // --- 3. Chapter-Bounded "Last-Good-Frame" Zero-Blackout Render Engine ---
+    const getChapterRange = (frameIdx: number) => {
+      if (frameIdx >= 150) return { start: 150, end: 194 }; // Chapter V: Campus
+      if (frameIdx >= 108) return { start: 108, end: 149 }; // Chapter IV: Labs
+      if (frameIdx >= 68)  return { start: 68, end: 107 };  // Chapter III: ATL Tinkering Lab
+      if (frameIdx >= 29)  return { start: 29, end: 67 };   // Chapter II: Values & Philosophy
+      return { start: 0, end: 28 };                         // Chapter I: Gateway of Wisdom
+    };
+
     const render = () => {
-      // Ensure we don't try to draw an undefined or unloaded image
-      const img = images[airframes.frame];
+      let targetIndex = airframes.frame;
+      let img = images[targetIndex];
+      const range = getChapterRange(targetIndex);
+
+      // 1. If target high-def frame is still downloading, scan backward ONLY inside this chapter!
       if (!img || !img.complete || img.naturalWidth === 0) {
-        // Fallback: draw dark background if scrolling faster than preload
-        context.fillStyle = '#070A0F';
-        context.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = targetIndex - 1; i >= range.start; i--) {
+          if (images[i] && images[i].complete && images[i].naturalWidth > 0) {
+            img = images[i];
+            break;
+          }
+        }
+      }
+
+      // 2. If still unpopulated, scan forward ONLY up to the end of this chapter!
+      if (!img || !img.complete || img.naturalWidth === 0) {
+        for (let i = targetIndex + 1; i <= range.end; i++) {
+          if (images[i] && images[i].complete && images[i].naturalWidth > 0) {
+            img = images[i];
+            break;
+          }
+        }
+      }
+
+      // 3. Ensure we never render an inappropriate cross-chapter scene or flash black boxes
+      if (!img || !img.complete || img.naturalWidth === 0) {
+        // Retain previous canvas state rather than clearing to #070A0F black box during transient loading
         return;
       }
 
